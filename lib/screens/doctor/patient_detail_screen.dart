@@ -9,6 +9,7 @@ import '../../services/doctor_service.dart';
 import 'doctor_widgets.dart';
 import 'full_medical_history_screen.dart';
 import 'add_diagnosis_screen.dart';
+import 'prescription_screen.dart';
 
 class PatientDetailScreen extends StatefulWidget {
   final String patientId, doctorId;
@@ -229,13 +230,27 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ])),
-      floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => Navigator.push(context, dSlide(AddDiagnosisScreen(
-              patientId: widget.patientId, patientName: p.name, doctorId: widget.doctorId,
-              doctorName: 'Dr. ${_profile?.name ?? 'Doctor'}'))),
-          backgroundColor: OV.slateDark, foregroundColor: Colors.white,
-          icon: const Icon(Icons.add_rounded),
-          label: Text('Add Diagnosis Note', style: GoogleFonts.manrope(fontWeight: FontWeight.w700))),
+      floatingActionButton: Column(mainAxisSize: MainAxisSize.min, children: [
+        FloatingActionButton(
+            heroTag: 'prescription',
+            onPressed: () => Navigator.push(context, dSlide(PrescriptionScreen(
+                doctorId: widget.doctorId,
+                doctorName: widget.doctorId,
+                doctorSpecialty: '',
+                patientId: widget.patientId,
+                patientName: p.name))),
+            backgroundColor: OV.primary, foregroundColor: Colors.white,
+            child: const Icon(Icons.medication_rounded)),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+            heroTag: 'diagnosis',
+            onPressed: () => Navigator.push(context, dSlide(AddDiagnosisScreen(
+                patientId: widget.patientId, patientName: p.name, doctorId: widget.doctorId,
+                doctorName: widget.doctorId))),
+            backgroundColor: OV.slateDark, foregroundColor: Colors.white,
+            icon: const Icon(Icons.add_rounded),
+            label: Text('Add Diagnosis', style: GoogleFonts.manrope(fontWeight: FontWeight.w700))),
+      ]),
     );
   }
 }

@@ -36,8 +36,28 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     }
     final d = _doctor;
     if (d == null) {
-      return Scaffold(body: Center(child: Text('Profile not found',
-          style: GoogleFonts.inter(fontSize: 15))));
+      // Show retry screen instead of blank "not found"
+      return Scaffold(backgroundColor: OV.background,
+          body: SafeArea(child: Center(child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.error_outline_rounded, size: 48, color: OV.outlineVariant),
+                const SizedBox(height: 16),
+                Text('Could not load profile', style: GoogleFonts.manrope(
+                    fontSize: 18, fontWeight: FontWeight.w700, color: OV.onSurface)),
+                const SizedBox(height: 8),
+                Text('Please check your connection and try again.',
+                    style: GoogleFonts.inter(fontSize: 13, color: OV.onSurfaceVariant),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                    onPressed: () { setState(() => _loading = true); _load(); },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text('Retry', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(backgroundColor: OV.slateDark,
+                        foregroundColor: Colors.white, elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+              ])))));
     }
 
     return Scaffold(

@@ -26,19 +26,29 @@ class DoctorService {
 
   // ── Doctor Profile ────────────────────────────────────────────
   Future<DoctorModel?> fetchDoctor(String uid) async {
-    final doc = await _doctors.doc(uid).get();
-    if (!doc.exists) {
-      // Try users collection fallback
+    try {
+      final doc = await _doctors.doc(uid).get();
+      if (doc.exists) {
+        return DoctorModel.fromMap(doc.data() as Map<String, dynamic>);
+      }
+      // Fall back to /users collection (new doctor who hasn't updated profile yet)
       final userDoc = await _users.doc(uid).get();
       if (!userDoc.exists) return null;
       final data = userDoc.data() as Map<String, dynamic>;
-      return DoctorModel(
-        uid: uid, name: data['name'] ?? '',
-        email: data['email'] ?? '', medicalId: data['medicalId'] ?? '',
+      // Auto-create a doctor profile from user data and save it
+      final doctorProfile = DoctorModel(
+        uid: uid,
+        name: data['name'] ?? '',
+        email: data['email'] ?? '',
+        medicalId: data['medicalId'] ?? '',
         createdAt: DateTime.now(),
       );
+      // Save to /doctors so next load is instant
+      await _doctors.doc(uid).set(doctorProfile.toMap(), SetOptions(merge: true));
+      return doctorProfile;
+    } catch (e) {
+      return null;
     }
-    return DoctorModel.fromMap(doc.data() as Map<String, dynamic>);
   }
 
   Future<void> updateDoctorProfile(DoctorModel doctor) async {
