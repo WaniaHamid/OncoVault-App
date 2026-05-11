@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
+import '../profile_selection_screen.dart';
 import '../../models/appointment_model.dart';
 import '../../models/doctor_model.dart';
 import '../../services/doctor_service.dart';
@@ -99,6 +101,35 @@ class _DashboardHome extends StatelessWidget {
                               decoration: const BoxDecoration(color: OV.error, shape: BoxShape.circle))),
                         ]));
                   }),
+              const SizedBox(width: 8),
+              // Logout button
+              GestureDetector(
+                  onTap: () async {
+                    final ctx = context;
+                    final confirm = await showDialog<bool>(context: ctx,
+                        builder: (_) => AlertDialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            title: Text('Sign Out', style: GoogleFonts.manrope(fontSize: 17, fontWeight: FontWeight.w700)),
+                            content: Text('Are you sure you want to sign out?',
+                                style: GoogleFonts.inter(fontSize: 14, color: OV.onSurfaceVariant)),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false),
+                                  child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: OV.onSurfaceVariant))),
+                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(backgroundColor: OV.error, elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                  child: Text('Sign Out', style: GoogleFonts.manrope(fontWeight: FontWeight.w700, color: Colors.white))),
+                            ]));
+                    if (confirm == true && ctx.mounted) {
+                      await AuthService().signOut();
+                      if (ctx.mounted) Navigator.pushAndRemoveUntil(ctx,
+                          MaterialPageRoute(builder: (_) => const ProfileSelectionScreen()), (r) => false);
+                    }
+                  },
+                  child: Container(padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: OV.outlineVariant.withOpacity(0.5))),
+                      child: Icon(Icons.logout_rounded, size: 16, color: OV.error))),
               const SizedBox(width: 8),
               GestureDetector(
                   onTap: () => Navigator.push(context, dSlide(DoctorProfileScreen(doctorId: doctorId))),

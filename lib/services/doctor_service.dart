@@ -62,21 +62,27 @@ class DoctorService {
   Stream<List<AppointmentModel>> watchDoctorAppointments(String doctorId) =>
       _appointments
           .where('doctorId', isEqualTo: doctorId)
-          .orderBy('appointmentDate', descending: false)
           .snapshots()
-          .map((s) => s.docs
-          .map((d) => AppointmentModel.fromMap(d.data() as Map<String, dynamic>))
-          .toList());
+          .map((s) {
+        final list = s.docs
+            .map((d) => AppointmentModel.fromMap(d.data() as Map<String, dynamic>))
+            .toList();
+        list.sort((a, b) => a.appointmentDate.compareTo(b.appointmentDate));
+        return list;
+      });
 
   Stream<List<AppointmentModel>> watchPendingAppointments(String doctorId) =>
       _appointments
           .where('doctorId', isEqualTo: doctorId)
           .where('status', isEqualTo: 'pending')
-          .orderBy('createdAt', descending: true)
           .snapshots()
-          .map((s) => s.docs
-          .map((d) => AppointmentModel.fromMap(d.data() as Map<String, dynamic>))
-          .toList());
+          .map((s) {
+        final list = s.docs
+            .map((d) => AppointmentModel.fromMap(d.data() as Map<String, dynamic>))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 
   Future<void> approveAppointment(AppointmentModel appt) async {
     final data = {
