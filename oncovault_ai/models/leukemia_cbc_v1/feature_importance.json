@@ -1,0 +1,56 @@
+[
+  {
+    "feature_key": "PLT",
+    "label": "Platelet Count",
+    "unit": "10^9/L",
+    "importance": 0.5354886931330091
+  },
+  {
+    "feature_key": "WBC",
+    "label": "White Blood Cell Count",
+    "unit": "10^9/L",
+    "importance": 0.16216903228098092
+  },
+  {
+    "feature_key": "MONO_ABS",
+    "label": "Absolute Monocyte Count (MONO#)",
+    "unit": "10^9/L",
+    "importance": 0.08459753829485148
+  },
+  {
+    "feature_key": "RDW_SD",
+    "label": "Red Cell Distribution Width (SD)",
+    "unit": "fL",
+    "importance": 0.05661215640437506
+  },
+  {
+    "feature_key": "RBC",
+    "label": "Red Blood Cell Count",
+    "unit": "10^12/L",
+    "importance": 0.05415787473094507
+  },
+  {
+    "feature_key": "NEUT_ABS",
+    "label": "Absolute Neutrophil Count (NEUT#)",
+    "unit": "10^9/L",
+    "importance": 0.04256127915233008
+  },
+  {
+    "feature_key": "NEUT_PCT",
+    "label": "Neutrophil Percentage (NEUT%)",
+    "unit": "%",
+    "importance": 0.029635599402301996
+  },
+  {
+    "feature_key": "RDW_CV",
+    "label": "Red Cell Distribution Width (CV)",
+    "unit": "%",
+    "importance": 0.02630676267822358
+  },
+  {
+    "feature_key": "HGB",
+    "label": "Hemoglobin",
+    "unit": "g/L",
+    "importance": 0.008471063922982684
+  }
+]

@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/blood_cancer_ehr_model.dart';
 import '../../services/doctor_service.dart';
+import 'voice_transcription_screen.dart';
+import 'ai_diagnosis_screen.dart';
 
 class BloodCancerEhrScreen extends StatefulWidget {
   final String patientId;
@@ -299,6 +301,78 @@ class _BloodCancerEhrScreenState extends State<BloodCancerEhrScreen> {
     }
   }
 
+  BloodCancerEhrModel _getCurrentEhrModel() {
+    final symptomsObj = BloodCancerSymptoms(
+      shortnessOfBreath: _symptoms['shortnessOfBreath'],
+      bonePain: _symptoms['bonePain'],
+      fever: _symptoms['fever'],
+      familyHistory: _symptoms['familyHistory'],
+      frequentInfections: _symptoms['frequentInfections'],
+      itchySkinOrRash: _symptoms['itchySkinOrRash'],
+      lossOfAppetiteOrNausea: _symptoms['lossOfAppetiteOrNausea'],
+      persistentWeaknessAndFatigue: _symptoms['persistentWeaknessAndFatigue'],
+      swollenPainlessLymphNodes: _symptoms['swollenPainlessLymphNodes'],
+      significantBruisingOrBleeding: _symptoms['significantBruisingOrBleeding'],
+      enlargedLiver: _symptoms['enlargedLiver'],
+      oralCavityChanges: _symptoms['oralCavityChanges'],
+      visionBlurring: _symptoms['visionBlurring'],
+      jaundice: _symptoms['jaundice'],
+      nightSweats: _symptoms['nightSweats'],
+      smokes: _symptoms['smokes'],
+    );
+
+    final cbcObj = BloodCancerCbc(
+      wbc: _parseNum(_wbcCtrl.text),
+      rbc: _parseNum(_rbcCtrl.text),
+      hemoglobin: _parseNum(_hbCtrl.text),
+      hematocrit: _parseNum(_hctCtrl.text),
+      platelets: _parseNum(_pltCtrl.text),
+      neutrophils: DifferentialCount(
+        absolute: _parseNum(_neutroAbsCtrl.text),
+        percentage: _parseNum(_neutroPctCtrl.text),
+      ),
+      lymphocytes: DifferentialCount(
+        absolute: _parseNum(_lymphoAbsCtrl.text),
+        percentage: _parseNum(_lymphoPctCtrl.text),
+      ),
+      monocytes: DifferentialCount(
+        absolute: _parseNum(_monoAbsCtrl.text),
+        percentage: _parseNum(_monoPctCtrl.text),
+      ),
+      eosinophils: DifferentialCount(
+        absolute: _parseNum(_eosAbsCtrl.text),
+        percentage: _parseNum(_eosPctCtrl.text),
+      ),
+      basophils: DifferentialCount(
+        absolute: _parseNum(_basoAbsCtrl.text),
+        percentage: _parseNum(_basoPctCtrl.text),
+      ),
+      rdwSd: _parseNum(_rdwSdCtrl.text),
+      rdwCv: _parseNum(_rdwCvCtrl.text),
+    );
+
+    return BloodCancerEhrModel(
+      recordId: _selectedRecordId ?? '',
+      patientId: widget.patientId,
+      patientName: widget.patientName,
+      doctorId: widget.doctorId,
+      doctorName: widget.doctorName,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      symptoms: symptomsObj,
+      cbc: cbcObj,
+      blastCellPercentage: _parseNum(_blastPctCtrl.text),
+      diseaseType: _diseaseTypeCtrl.text.trim().isNotEmpty ? _diseaseTypeCtrl.text.trim() : null,
+      diagnosisSubtype: _subtypeCtrl.text.trim().isNotEmpty ? _subtypeCtrl.text.trim() : null,
+      stage: _stageCtrl.text.trim().isNotEmpty ? _stageCtrl.text.trim() : null,
+      diagnosisStatus: _statusCtrl.text.trim().isNotEmpty ? _statusCtrl.text.trim() : null,
+      clinicalNotes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+      boneMarrowBiopsy: _boneMarrowCtrl.text.trim().isNotEmpty ? _boneMarrowCtrl.text.trim() : null,
+      chemotherapy: _chemoCtrl.text.trim().isNotEmpty ? _chemoCtrl.text.trim() : null,
+      medications: _medsCtrl.text.split(',').map((m) => m.trim()).where((m) => m.isNotEmpty).toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -315,6 +389,22 @@ class _BloodCancerEhrScreenState extends State<BloodCancerEhrScreen> {
           style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w700, color: OV.onSurface),
         ),
         actions: [
+          IconButton(
+            tooltip: 'AI Risk Assessment',
+            icon: const Icon(Icons.auto_awesome_rounded, color: OV.primary, size: 20),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AiDiagnosisScreen(
+                    patientId: widget.patientId,
+                    patientName: widget.patientName,
+                    initialEhr: _getCurrentEhrModel(),
+                  ),
+                ),
+              );
+            },
+          ),
           TextButton.icon(
             onPressed: () => setState(() => _isEditing = !_isEditing),
             icon: Icon(_isEditing ? Icons.visibility_rounded : Icons.edit_rounded, size: 16, color: OV.primary),
@@ -405,6 +495,14 @@ class _BloodCancerEhrScreenState extends State<BloodCancerEhrScreen> {
                 // ── Record Selector / History Header ────────────────
                 if (records.isNotEmpty)
                   _buildHistorySelector(records, currentRecord),
+
+                // ── AI Clinical Decision Support Card ───────────────
+                _buildAiClinicalDecisionSupportCard(currentRecord),
+
+                const SizedBox(height: 16),
+
+                // ── Voice Clinical Documentation Card ───────────────
+                _buildVoiceDocumentationCard(currentRecord),
 
                 const SizedBox(height: 16),
 
@@ -1104,6 +1202,281 @@ class _BloodCancerEhrScreenState extends State<BloodCancerEhrScreen> {
           child: _numField(controller: pctCtrl, label: 'Percentage', unit: '%', hint: '60.0'),
         ),
       ],
+    );
+  }
+
+  Widget _buildVoiceDocumentationCard(BloodCancerEhrModel? currentRecord) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: OV.primary.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: OV.primary.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: OV.primaryContainer.withOpacity(0.7),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.mic_rounded, color: OV.primary, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Voice Clinical Documentation',
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: OV.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Dictate symptoms, observations & lab results',
+                  style: GoogleFonts.inter(fontSize: 12, color: OV.outline),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VoiceTranscriptionScreen(
+                    patientId: widget.patientId,
+                    patientName: widget.patientName,
+                    doctorId: widget.doctorId,
+                    doctorName: widget.doctorName,
+                    currentEhr: currentRecord,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.record_voice_over_rounded, size: 16),
+            label: Text('Dictate', style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: OV.slateDark,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiClinicalDecisionSupportCard(BloodCancerEhrModel? currentRecord) {
+    final ai = currentRecord?.aiAnalysis;
+    final hasAi = ai != null && ai.prediction != null;
+    final isElevated = hasAi &&
+        (ai.prediction!.toLowerCase().contains('elevated') ||
+         ai.prediction!.toLowerCase().contains('high') ||
+         (ai.riskScore != null && ai.riskScore! >= 0.5));
+
+    final themeColor = hasAi
+        ? (isElevated ? const Color(0xFFC93B2B) : const Color(0xFF1B6B3A))
+        : OV.primary;
+    final bgColor = hasAi
+        ? (isElevated ? const Color(0xFFFDF2F2) : const Color(0xFFF0FDF4))
+        : Colors.white;
+    final borderColor = hasAi
+        ? themeColor.withOpacity(0.3)
+        : OV.primary.withOpacity(0.3);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: themeColor.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: themeColor.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.auto_awesome_rounded, color: themeColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'AI Clinical Decision Support',
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: OV.onSurface,
+                            ),
+                          ),
+                        ),
+                        if (hasAi && ai.doctorReviewed) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1B6B3A).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF1B6B3A).withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF1B6B3A)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Doctor Reviewed',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1B6B3A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasAi
+                          ? (ai.modelVersion != null
+                              ? 'Model: ${ai.modelVersion}'
+                              : 'Dual AI Risk Assessment (Symptoms + CBC)')
+                          : 'Dual Independent AI Models (Symptoms + CBC)',
+                      style: GoogleFonts.inter(fontSize: 12, color: OV.outline),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AiDiagnosisScreen(
+                        patientId: widget.patientId,
+                        patientName: widget.patientName,
+                        initialEhr: currentRecord ?? _getCurrentEhrModel(),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.auto_awesome_rounded, size: 15),
+                label: Text(
+                  hasAi ? 'Review AI' : 'Run AI',
+                  style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: themeColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+          if (hasAi) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isElevated ? const Color(0xFFFDE8E8) : const Color(0xFFDEF7EC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isElevated ? const Color(0xFFF8B4B4) : const Color(0xFF84E1BC),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isElevated ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded,
+                        size: 14,
+                        color: isElevated ? const Color(0xFFC93B2B) : const Color(0xFF1B6B3A),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isElevated ? 'Elevated Risk' : 'Lower Risk Profile',
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: isElevated ? const Color(0xFFC93B2B) : const Color(0xFF1B6B3A),
+                        ),
+                      ),
+                      if (ai.riskScore != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '(${(ai.riskScore! * 100).toStringAsFixed(1)}%)',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isElevated ? const Color(0xFFC93B2B) : const Color(0xFF1B6B3A),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                if (ai.analyzedAt != null)
+                  Text(
+                    DateFormat('MMM d, yyyy • hh:mm a').format(ai.analyzedAt!),
+                    style: GoogleFonts.inter(fontSize: 11, color: OV.outline),
+                  ),
+              ],
+            ),
+            if (ai.prediction != null && ai.prediction!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                ai.prediction!,
+                style: GoogleFonts.inter(fontSize: 12, color: OV.onSurfaceVariant, height: 1.35),
+              ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }

@@ -1,0 +1,57 @@
+{
+  "cross_validation": {
+    "Logistic Regression (Balanced)": {
+      "accuracy_mean": 0.9294975526920387,
+      "recall_sensitivity_mean": 0.9215686274509804,
+      "precision_mean": 0.9791808713559865,
+      "f1_mean": 0.9492018331366815,
+      "roc_auc_mean": 0.9872907239819003
+    },
+    "Logistic Regression (Default)": {
+      "accuracy_mean": 0.9435820597342923,
+      "recall_sensitivity_mean": 0.9666666666666666,
+      "precision_mean": 0.9557353779118485,
+      "f1_mean": 0.9610068955006785,
+      "roc_auc_mean": 0.9870481397687281
+    },
+    "Random Forest": {
+      "accuracy_mean": 0.9337029267805415,
+      "recall_sensitivity_mean": 0.9352941176470588,
+      "precision_mean": 0.971550297694943,
+      "f1_mean": 0.9528438417738758,
+      "roc_auc_mean": 0.9880813222724989
+    },
+    "Gradient Boosting": {
+      "accuracy_mean": 0.9449805214264309,
+      "recall_sensitivity_mean": 0.9627450980392156,
+      "precision_mean": 0.960925248611493,
+      "f1_mean": 0.9617468078037401,
+      "roc_auc_mean": 0.9901300904977376
+    }
+  },
+  "independent_test": {
+    "accuracy": 0.9312977099236641,
+    "precision": 0.9550561797752809,
+    "recall_sensitivity": 0.9444444444444444,
+    "specificity": 0.9024390243902439,
+    "f1_score": 0.9497206703910615,
+    "roc_auc": 0.9867208672086721,
+    "confusion_matrix": {
+      "true_negatives": 37,
+      "false_positives": 4,
+      "false_negatives": 5,
+      "true_positives": 85,
+      "raw_matrix": [
+        [
+          37,
+          4
+        ],
+        [
+          5,
+          85
+        ]
+      ]
+    },
+    "total_samples": 131
+  }
+}

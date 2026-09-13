@@ -1,0 +1,227 @@
+{
+  "cross_validation": {
+    "Logistic Regression": {
+      "accuracy_mean": 0.847150875871422,
+      "recall_sensitivity_mean": 0.8341873096021093,
+      "precision_mean": 0.7403198494192319,
+      "f1_mean": 0.7844099291199481,
+      "roc_auc_mean": 0.9125163788364106
+    },
+    "Random Forest": {
+      "accuracy_mean": 0.9016789662551167,
+      "recall_sensitivity_mean": 0.8963669675768502,
+      "precision_mean": 0.8241861963529387,
+      "f1_mean": 0.8587391364370103,
+      "roc_auc_mean": 0.9619175207455882
+    },
+    "Gradient Boosting": {
+      "accuracy_mean": 0.9086991408913374,
+      "recall_sensitivity_mean": 0.8590362800172657,
+      "precision_mean": 0.8660242225489423,
+      "f1_mean": 0.8625018819014146,
+      "roc_auc_mean": 0.9643656284115079
+    }
+  },
+  "validation_sites": {
+    "valid_site_A.csv": {
+      "accuracy": 0.9333511152602274,
+      "precision": 0.3977382875605816,
+      "recall_sensitivity": 0.9011713030746705,
+      "specificity": 0.934886645474552,
+      "f1_score": 0.5518941941268773,
+      "roc_auc": 0.9657252172525902,
+      "confusion_matrix": {
+        "true_negatives": 53526,
+        "false_positives": 3728,
+        "false_negatives": 270,
+        "true_positives": 2462,
+        "raw_matrix": [
+          [
+            53526,
+            3728
+          ],
+          [
+            270,
+            2462
+          ]
+        ]
+      },
+      "total_samples": 59986
+    },
+    "valid_site_B.csv": {
+      "accuracy": 0.9527211681111892,
+      "precision": 0.2532316871063971,
+      "recall_sensitivity": 0.8188638799571275,
+      "specificity": 0.9552042946614971,
+      "f1_score": 0.3868354430379747,
+      "roc_auc": 0.9608424656797138,
+      "confusion_matrix": {
+        "true_negatives": 48042,
+        "false_positives": 2253,
+        "false_negatives": 169,
+        "true_positives": 764,
+        "raw_matrix": [
+          [
+            48042,
+            2253
+          ],
+          [
+            169,
+            764
+          ]
+        ]
+      },
+      "total_samples": 51228
+    },
+    "valid_site_C.csv": {
+      "accuracy": 0.9152174346102512,
+      "precision": 0.3049664429530201,
+      "recall_sensitivity": 0.8206116060679027,
+      "specificity": 0.9192997038807211,
+      "f1_score": 0.44467640918580376,
+      "roc_auc": 0.9477971612023288,
+      "confusion_matrix": {
+        "true_negatives": 88478,
+        "false_positives": 7767,
+        "false_negatives": 745,
+        "true_positives": 3408,
+        "raw_matrix": [
+          [
+            88478,
+            7767
+          ],
+          [
+            745,
+            3408
+          ]
+        ]
+      },
+      "total_samples": 100398
+    },
+    "valid_site_D.csv": {
+      "accuracy": 0.9110256580255918,
+      "precision": 0.3107957707289928,
+      "recall_sensitivity": 0.8436555891238671,
+      "specificity": 0.9141182997018237,
+      "f1_score": 0.45424969499796664,
+      "roc_auc": 0.9456855100326793,
+      "confusion_matrix": {
+        "true_negatives": 26365,
+        "false_positives": 2477,
+        "false_negatives": 207,
+        "true_positives": 1117,
+        "raw_matrix": [
+          [
+            26365,
+            2477
+          ],
+          [
+            207,
+            1117
+          ]
+        ]
+      },
+      "total_samples": 30166
+    },
+    "valid_site_E.csv": {
+      "accuracy": 0.9450063613231552,
+      "precision": 0.3094241593303507,
+      "recall_sensitivity": 0.8421052631578947,
+      "specificity": 0.9478610499705798,
+      "f1_score": 0.4525593667546174,
+      "roc_auc": 0.9684590190311932,
+      "confusion_matrix": {
+        "true_negatives": 86989,
+        "false_positives": 4785,
+        "false_negatives": 402,
+        "true_positives": 2144,
+        "raw_matrix": [
+          [
+            86989,
+            4785
+          ],
+          [
+            402,
+            2144
+          ]
+        ]
+      },
+      "total_samples": 94320
+    },
+    "valid_site_F.csv": {
+      "accuracy": 0.9287377967193617,
+      "precision": 0.391911410688493,
+      "recall_sensitivity": 0.8230535894843276,
+      "specificity": 0.9341844710786869,
+      "f1_score": 0.5309849967384214,
+      "roc_auc": 0.9580513844051107,
+      "confusion_matrix": {
+        "true_negatives": 17927,
+        "false_positives": 1263,
+        "false_negatives": 175,
+        "true_positives": 814,
+        "raw_matrix": [
+          [
+            17927,
+            1263
+          ],
+          [
+            175,
+            814
+          ]
+        ]
+      },
+      "total_samples": 20179
+    },
+    "valid_site_G.csv": {
+      "accuracy": 0.8260084286574353,
+      "precision": 0.5209580838323353,
+      "recall_sensitivity": 0.8419354838709677,
+      "specificity": 0.8223538119911177,
+      "f1_score": 0.6436498150431565,
+      "roc_auc": 0.9112464151073545,
+      "confusion_matrix": {
+        "true_negatives": 3333,
+        "false_positives": 720,
+        "false_negatives": 147,
+        "true_positives": 783,
+        "raw_matrix": [
+          [
+            3333,
+            720
+          ],
+          [
+            147,
+            783
+          ]
+        ]
+      },
+      "total_samples": 4983
+    }
+  },
+  "independent_test": {
+    "accuracy": 0.9274978198047229,
+    "precision": 0.33787828400399067,
+    "recall_sensitivity": 0.8873362445414847,
+    "specificity": 0.9291345589151287,
+    "f1_score": 0.48940269749518306,
+    "roc_auc": 0.9642648525898762,
+    "confusion_matrix": {
+      "true_negatives": 52209,
+      "false_positives": 3982,
+      "false_negatives": 258,
+      "true_positives": 2032,
+      "raw_matrix": [
+        [
+          52209,
+          3982
+        ],
+        [
+          258,
+          2032
+        ]
+      ]
+    },
+    "total_samples": 58481
+  }
+}

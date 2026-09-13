@@ -5,34 +5,34 @@ from .normalizer import clean_unit
 
 CBC_PATTERNS = {
     "wbc": [
-        r"\b(?:wbc|white blood cell count|white blood cells?|white count|total leukocyte count|tlc)\b",
+        r"\b(?:wbc count|wbc|white blood cell count|white blood cells?|white count|total leukocyte count|tlc)\b",
     ],
     "rbc": [
-        r"\b(?:rbc|red blood cell count|red blood cells?|erythrocyte count|erythrocytes)\b",
+        r"\b(?:rbc count|rbc|red blood cell count|red blood cells?|erythrocyte count|erythrocytes)\b",
     ],
     "hemoglobin": [
-        r"\b(?:hemoglobin|hgb|hb)\b",
+        r"\b(?:hemoglobin count|hemoglobin|hgb|hb)\b",
     ],
     "hematocrit": [
         r"\b(?:hematocrit|hct|packed cell volume|pcv)\b",
     ],
     "platelets": [
-        r"\b(?:platelets?|plt|platelet count|thrombocytes?)\b",
+        r"\b(?:platelet count|platelets?|plt|thrombocytes?)\b",
     ],
     "neutrophils": [
-        r"\b(?:neutrophils?|neutrophil count|anc|absolute neutrophil count|polys|segs)\b",
+        r"\b(?:neutrophil count|neutrophils?|anc|absolute neutrophil count|polys|segs)\b",
     ],
     "lymphocytes": [
-        r"\b(?:lymphocytes?|lymphocyte count|alc|absolute lymphocyte count|lymphs)\b",
+        r"\b(?:lymphocyte count|lymphocytes?|alc|absolute lymphocyte count|lymphs)\b",
     ],
     "monocytes": [
-        r"\b(?:monocytes?|monocyte count|amc|absolute monocyte count|monos)\b",
+        r"\b(?:monocyte count|monocytes?|amc|absolute monocyte count|monos)\b",
     ],
     "eosinophils": [
-        r"\b(?:eosinophils?|eosinophil count|aec|absolute eosinophil count|eos)\b",
+        r"\b(?:eosinophil count|eosinophils?|aec|absolute eosinophil count|eos)\b",
     ],
     "basophils": [
-        r"\b(?:basophils?|basophil count|basos)\b",
+        r"\b(?:basophil count|basophils?|basos)\b",
     ],
     "rdwSd": [
         r"\b(?:rdw-sd|rdw sd)\b",
@@ -42,10 +42,12 @@ CBC_PATTERNS = {
     ],
 }
 
+UNIT_PATTERN = r"(?:k/uL|k/ul|k/microl|10\^3/uL|10\^9/L|thousand/ul|thou/ul|k|g/dL|g/dl|gm/dl|M/uL|m/ul|mil/ul|10\^6/ul|%|percent|pct|fL|fl)"
+
 def _extract_number_and_unit(following_text: str) -> Tuple[Optional[float], Optional[str], Optional[str]]:
-    # Match numbers e.g. "is 14.5 k/uL", "= 10.2 g/dL", "110", "at 65 percent", "3.2 k/uL (65%)"
+    # Match numbers e.g. "is 14.5 k/uL", "are 110 k/uL", "= 10.2 g/dL", "110", "at 65 percent", "3.2 k/uL (65%)"
     match = re.search(
-        r"^(?:\s*(?:is|was|of|:|level is|count is|=|\bstands at\b|\baround\b|\bat\b))?\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z/%^0-9]+)?",
+        rf"^(?:\s*(?:is|was|are|were|of|:|level is|count is|=|\bstands at\b|\baround\b|\bat\b))?\s*([0-9]+(?:\.[0-9]+)?)(?:\s*({UNIT_PATTERN}))?",
         following_text,
         re.IGNORECASE
     )

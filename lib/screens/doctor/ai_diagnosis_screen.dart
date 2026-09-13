@@ -1,304 +1,696 @@
 // lib/screens/doctor/ai_diagnosis_screen.dart
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
+import '../../models/blood_cancer_ehr_model.dart';
+import '../../services/ai_risk_assessment_service.dart';
+import '../../services/doctor_service.dart';
 import 'doctor_widgets.dart';
 
 class AiDiagnosisScreen extends StatefulWidget {
   final String patientId, patientName;
-  const AiDiagnosisScreen({super.key, required this.patientId, required this.patientName});
+  final BloodCancerEhrModel? initialEhr;
+
+  const AiDiagnosisScreen({
+    super.key,
+    required this.patientId,
+    required this.patientName,
+    this.initialEhr,
+  });
+
   @override
   State<AiDiagnosisScreen> createState() => _AiDiagnosisScreenState();
 }
 
 class _AiDiagnosisScreenState extends State<AiDiagnosisScreen>
     with SingleTickerProviderStateMixin {
-  final _symptomsCtrl = TextEditingController();
-  bool _analyzing     = false;
-  bool _hasResult     = false;
-  late AnimationController _progressCtrl;
-  late Animation<double>   _progressAnim;
+  final AiRiskAssessmentService _aiService = AiRiskAssessmentService();
+  final DoctorService _doctorService = DoctorService();
+
+  BloodCancerEhrModel? _ehr;
+  bool _loadingEhr = true;
+  bool _assessingSymptoms = false;
+  bool _assessingCbc = false;
+  bool _savingReview = false;
+
+  AiRiskResult? _symptomResult;
+  AiRiskResult? _cbcResult;
 
   @override
   void initState() {
     super.initState();
-    _progressCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
-    _progressAnim = Tween<double>(begin: 0, end: 0.88)
-        .animate(CurvedAnimation(parent: _progressCtrl, curve: Curves.easeOutCubic));
+    _loadPatientEhr();
   }
 
-  @override
-  void dispose() { _symptomsCtrl.dispose(); _progressCtrl.dispose(); super.dispose(); }
+  Future<void> _loadPatientEhr() async {
+    if (widget.initialEhr != null) {
+      _ehr = widget.initialEhr;
+      setState(() => _loadingEhr = false);
+      return;
+    }
 
-  Future<void> _analyze() async {
-    if (_symptomsCtrl.text.trim().isEmpty) return;
-    setState(() { _analyzing = true; _hasResult = false; });
-    _progressCtrl.forward(from: 0);
-    await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
-    setState(() { _analyzing = false; _hasResult = true; });
+    setState(() => _loadingEhr = true);
+    try {
+      _ehr = await _doctorService.fetchLatestBloodCancerEhr(widget.patientId);
+    } catch (e) {
+      debugPrint('Error loading EHR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loadingEhr = false);
+      }
+    }
+  }
+
+  Future<void> _runSymptomAssessment() async {
+    final symptoms = _ehr?.symptoms ?? const BloodCancerSymptoms();
+    setState(() => _assessingSymptoms = true);
+
+    try {
+      final result = await _aiService.assessSymptoms(symptoms);
+      if (mounted) {
+        setState(() {
+          _symptomResult = result;
+          _assessingSymptoms = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _assessingSymptoms = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Symptom assessment error: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _runCbcAssessment() async {
+    final cbc = _ehr?.cbc ?? const BloodCancerCbc();
+    setState(() => _assessingCbc = true);
+
+    try {
+      final result = await _aiService.assessCbc(cbc);
+      if (mounted) {
+        setState(() {
+          _cbcResult = result;
+          _assessingCbc = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _assessingCbc = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('CBC assessment error: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _runBothAssessments() async {
+    await Future.wait([
+      _runSymptomAssessment(),
+      _runCbcAssessment(),
+    ]);
+  }
+
+  Future<void> _saveDoctorReview() async {
+    if (_symptomResult == null && _cbcResult == null) return;
+    setState(() => _savingReview = true);
+
+    try {
+      String prediction;
+      double riskScore;
+      String modelVersion;
+
+      if (_cbcResult != null && _symptomResult != null) {
+        prediction = 'CBC: ${_cbcResult!.prediction} (${(_cbcResult!.riskScore * 100).toStringAsFixed(1)}%) | Symptoms: ${_symptomResult!.prediction} (${(_symptomResult!.riskScore * 100).toStringAsFixed(1)}%)';
+        riskScore = _cbcResult!.riskScore > _symptomResult!.riskScore ? _cbcResult!.riskScore : _symptomResult!.riskScore;
+        modelVersion = '${_cbcResult!.modelVersion} & ${_symptomResult!.modelVersion}';
+      } else if (_cbcResult != null) {
+        prediction = 'CBC: ${_cbcResult!.prediction} (${(_cbcResult!.riskScore * 100).toStringAsFixed(1)}%)';
+        riskScore = _cbcResult!.riskScore;
+        modelVersion = _cbcResult!.modelVersion;
+      } else {
+        prediction = 'Symptoms: ${_symptomResult!.prediction} (${(_symptomResult!.riskScore * 100).toStringAsFixed(1)}%)';
+        riskScore = _symptomResult!.riskScore;
+        modelVersion = _symptomResult!.modelVersion;
+      }
+
+      final updatedAi = AiAnalysisMetadata(
+        prediction: prediction,
+        riskScore: riskScore,
+        modelVersion: modelVersion,
+        analyzedAt: DateTime.now(),
+        doctorReviewed: true,
+      );
+
+      var recordToSave = _ehr;
+      if (recordToSave == null || recordToSave.recordId.isEmpty) {
+        final latest = await _doctorService.fetchLatestBloodCancerEhr(widget.patientId);
+        if (latest != null) {
+          recordToSave = latest.copyWith(
+            symptoms: _ehr?.symptoms ?? latest.symptoms,
+            cbc: _ehr?.cbc ?? latest.cbc,
+            aiAnalysis: updatedAi,
+          );
+        } else if (recordToSave != null) {
+          recordToSave = recordToSave.copyWith(aiAnalysis: updatedAi);
+        }
+      } else {
+        recordToSave = recordToSave.copyWith(aiAnalysis: updatedAi);
+      }
+
+      if (recordToSave != null) {
+        await _doctorService.saveBloodCancerEhr(recordToSave);
+      }
+
+      if (mounted) {
+        setState(() => _savingReview = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Doctor review confirmed and saved to patient EHR.'),
+            backgroundColor: OV.primary,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _savingReview = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save review: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: OV.background,
-      body: SafeArea(child: Column(children: [
-        DoctorAppBar(title: 'AI Diagnostic Assistant', showBack: true),
-
-        Expanded(child: SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Header
-              Text('AI Diagnostic\nAssistant', style: GoogleFonts.manrope(
-                  fontSize: 28, fontWeight: FontWeight.w700, color: OV.onSurface,
-                  height: 1.2, letterSpacing: -0.4)),
-              const SizedBox(height: 6),
-              Text('Analyze patient symptoms and biometric data using our advanced oncology-trained neural network for rapid clinical insight.',
-                  style: GoogleFonts.inter(fontSize: 13, color: OV.onSurfaceVariant, height: 1.5)),
-              const SizedBox(height: 16),
-
-              // AI Engine badge
-              DCard(child: Row(children: [
-                Container(width: 40, height: 40,
-                    decoration: BoxDecoration(color: OV.primaryContainer, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(Icons.psychology_rounded, color: OV.primary, size: 22)),
-                const SizedBox(width: 12),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Text('AI ENGINE ACTIVE', style: GoogleFonts.inter(
-                        fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1, color: OV.tertiary)),
-                    const SizedBox(width: 6),
-                    Container(width: 6, height: 6, decoration: const BoxDecoration(
-                        color: OV.tertiary, shape: BoxShape.circle)),
-                  ]),
-                  Text('V4.2 Oncology Core', style: GoogleFonts.manrope(
-                      fontSize: 13, fontWeight: FontWeight.w700, color: OV.onSurface)),
-                ]),
-                const Spacer(),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(100)),
-                    child: Text('COMING SOON', style: GoogleFonts.inter(
-                        fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5,
-                        color: const Color(0xFF8B5000)))),
-              ])),
-              const SizedBox(height: 20),
-
-              // Input form
-              DCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Analyze Symptoms', style: GoogleFonts.manrope(
-                    fontSize: 16, fontWeight: FontWeight.w700, color: OV.onSurface)),
-                const SizedBox(height: 14),
-                Text('SYMPTOM DESCRIPTION', style: GoogleFonts.inter(
-                    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: OV.outline)),
-                const SizedBox(height: 8),
-                TextField(
-                    controller: _symptomsCtrl, maxLines: 5,
-                    style: GoogleFonts.inter(fontSize: 13, color: OV.onSurface),
-                    decoration: InputDecoration(
-                        hintText: 'Describe clinical observations, patient discomfort, or radiological findings...',
-                        hintStyle: GoogleFonts.inter(fontSize: 12, color: OV.outline),
-                        filled: true, fillColor: OV.surfaceLow,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: OV.outlineVariant.withOpacity(0.6))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: OV.outlineVariant.withOpacity(0.6))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: OV.primary, width: 1.5)),
-                        contentPadding: const EdgeInsets.all(14))),
-                const SizedBox(height: 14),
-                // Upload / Camera row
-                Row(children: [
-                  Expanded(child: _AttachButton(icon: Icons.upload_file_rounded, label: 'Upload Lab Results', action: 'Browse')),
-                  const SizedBox(width: 10),
-                  Expanded(child: _AttachButton(icon: Icons.camera_alt_outlined, label: 'Attach Scan Image', action: 'Camera')),
-                ]),
-                const SizedBox(height: 16),
-                SizedBox(width: double.infinity, height: 50,
-                    child: ElevatedButton.icon(
-                        onPressed: _analyzing ? null : _analyze,
-                        icon: _analyzing
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.auto_awesome_rounded, size: 18),
-                        label: Text(_analyzing ? 'Analyzing...' : 'Analyze Clinical Data',
-                            style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700)),
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: OV.primary, foregroundColor: Colors.white, elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
-              ])),
-
-              if (_analyzing) ...[
-                const SizedBox(height: 20),
-                _AnalyzingLoader(animation: _progressAnim),
-              ],
-
-              if (_hasResult) ...[
-                const SizedBox(height: 20),
-                _ResultSection(),
-                const SizedBox(height: 16),
-                _ConfidenceCircle(),
-                const SizedBox(height: 16),
-                _NextStepsCard(),
-              ],
-
-              const SizedBox(height: 30),
-            ]))),
-      ])),
-      floatingActionButton: FloatingActionButton(
-          onPressed: () {},
-          backgroundColor: OV.slateDark, foregroundColor: Colors.white,
-          child: const Icon(Icons.picture_as_pdf_outlined)),
+      body: SafeArea(
+        child: Column(
+          children: [
+            DoctorAppBar(
+              title: 'AI Leukemia Risk Assessment',
+              showBack: true,
+            ),
+            Expanded(
+              child: _loadingEhr
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildPatientHeader(),
+                          const SizedBox(height: 16),
+                          _buildRunAllButton(),
+                          const SizedBox(height: 20),
+                          _buildSymptomCard(),
+                          const SizedBox(height: 16),
+                          _buildCbcCard(),
+                          const SizedBox(height: 20),
+                          _buildClinicalDisclaimer(),
+                          const SizedBox(height: 20),
+                          _buildDoctorReviewCard(),
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
-}
 
-class _AttachButton extends StatelessWidget {
-  final IconData icon; final String label, action;
-  const _AttachButton({required this.icon, required this.label, required this.action});
-  @override
-  Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-      decoration: BoxDecoration(color: OV.surfaceLow, borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: OV.outlineVariant.withOpacity(0.5))),
-      child: Row(children: [
-        Icon(icon, size: 14, color: OV.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 10, color: OV.onSurface),
-            maxLines: 1, overflow: TextOverflow.ellipsis)),
-        Text(action, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: OV.primary)),
-      ]));
-}
-
-class _AnalyzingLoader extends StatelessWidget {
-  final Animation<double> animation;
-  const _AnalyzingLoader({required this.animation});
-  @override
-  Widget build(BuildContext context) => DCard(child: Column(children: [
-    Row(children: [
-      const SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 2, color: OV.primary)),
-      const SizedBox(width: 10),
-      Text('AI is analyzing patient data...', style: GoogleFonts.inter(fontSize: 13, color: OV.primary, fontWeight: FontWeight.w600)),
-    ]),
-    const SizedBox(height: 12),
-    AnimatedBuilder(animation: animation, builder: (_, __) =>
-        ClipRRect(borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: animation.value, minHeight: 6,
-                backgroundColor: OV.outlineVariant.withOpacity(0.3),
-                valueColor: const AlwaysStoppedAnimation(OV.primary)))),
-    const SizedBox(height: 8),
-    Text('Cross-referencing 1.2M oncology cases...', style: GoogleFonts.inter(fontSize: 11, color: OV.onSurfaceVariant)),
-  ]));
-}
-
-class _ResultSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: OV.primaryContainer, borderRadius: BorderRadius.circular(100)),
-        child: Text('MOST LIKELY MATCH', style: GoogleFonts.inter(
-            fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1, color: OV.primary))),
-    const SizedBox(height: 10),
-    Text('Stage II Adenocarcinoma', style: GoogleFonts.manrope(
-        fontSize: 22, fontWeight: FontWeight.w700, color: OV.onSurface, letterSpacing: -0.3)),
-    const SizedBox(height: 6),
-    Text('Symptoms align with secondary progression patterns observed in 82% of similar histological profiles.',
-        style: GoogleFonts.inter(fontSize: 13, color: OV.onSurfaceVariant, height: 1.5)),
-    const SizedBox(height: 8),
-    GestureDetector(onTap: () {},
-        child: Row(children: [
-          Text('View Deep Insight', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: OV.primary)),
-          const SizedBox(width: 4),
-          Icon(Icons.arrow_forward_rounded, size: 14, color: OV.primary),
-        ])),
-    const SizedBox(height: 16),
-    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: OV.secondaryContainer, borderRadius: BorderRadius.circular(100)),
-        child: Text('COMPARATIVE DATA', style: GoogleFonts.inter(
-            fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1, color: OV.secondary))),
-    const SizedBox(height: 10),
-    Text('Cohort Analysis', style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.w700, color: OV.onSurface)),
-    const SizedBox(height: 4),
-    Text('Patient profiles within this demographic respond 15% better to targeted immunotherapy combinations.',
-        style: GoogleFonts.inter(fontSize: 13, color: OV.onSurfaceVariant, height: 1.5)),
-    const SizedBox(height: 6),
-    GestureDetector(onTap: () {},
-        child: Row(children: [
-          Text('View Cohort Map', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: OV.primary)),
-          const SizedBox(width: 4),
-          Icon(Icons.grid_view_rounded, size: 14, color: OV.primary),
-        ])),
-  ]);
-}
-
-class _ConfidenceCircle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => DCard(child: Column(children: [
-    Text('CONFIDENCE SCORE', style: GoogleFonts.inter(
-        fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1, color: OV.outline)),
-    const SizedBox(height: 16),
-    SizedBox(width: 140, height: 140, child: Stack(alignment: Alignment.center, children: [
-      CustomPaint(size: const Size(140, 140), painter: _CirclePainter(progress: 0.88)),
-      Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('88%', style: GoogleFonts.manrope(fontSize: 32, fontWeight: FontWeight.w800, color: OV.primary)),
-        Text('HIGH PRECISION', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800,
-            letterSpacing: 0.5, color: OV.onSurfaceVariant)),
-      ]),
-    ])),
-    const SizedBox(height: 12),
-    Text('Based on 1.2M historical oncology cases\nand current patient biomarkers.',
-        style: GoogleFonts.inter(fontSize: 12, color: OV.onSurfaceVariant, height: 1.4),
-        textAlign: TextAlign.center),
-  ]));
-}
-
-class _CirclePainter extends CustomPainter {
-  final double progress;
-  const _CirclePainter({required this.progress});
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 8;
-    final bgPaint = Paint()..color = OV.outlineVariant.withOpacity(0.2)
-      ..strokeWidth = 12 ..style = PaintingStyle.stroke ..strokeCap = StrokeCap.round;
-    final fgPaint = Paint()..color = OV.primary ..strokeWidth = 12
-      ..style = PaintingStyle.stroke ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(center, radius, bgPaint);
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius),
-        -pi / 2, 2 * pi * progress, false, fgPaint);
+  Widget _buildPatientHeader() {
+    return DCard(
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: OV.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.person_outline_rounded,
+                color: OV.primary, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.patientName,
+                  style: GoogleFonts.manrope(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: OV.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'ID: ${widget.patientId} • Clinical Decision Support',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: OV.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
-  @override
-  bool shouldRepaint(_) => false;
-}
 
-class _NextStepsCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => DCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text('Next Steps', style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w700, color: OV.onSurface)),
-    const SizedBox(height: 14),
-    ...[
-      {'num': '01', 'title': 'Verify with PET/CT', 'sub': 'Recommended for metabolic activity mapping in localized thoracic regions.'},
-      {'num': '02', 'title': 'Consult Pathologist', 'sub': 'Share generated AI report with Dr. Aris Thorne for histological validation.'},
-      {'num': '03', 'title': 'Schedule Biopsy', 'sub': 'Liquid biopsy suggested to monitor cell-free DNA fragments.'},
-    ].map((step) => Padding(padding: const EdgeInsets.only(bottom: 14), child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(width: 28, height: 28,
-          decoration: BoxDecoration(color: OV.primaryContainer, borderRadius: BorderRadius.circular(8)),
-          child: Center(child: Text(step['num']!, style: GoogleFonts.manrope(
-              fontSize: 11, fontWeight: FontWeight.w800, color: OV.primary)))),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(step['title']!, style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w700, color: OV.onSurface)),
-        const SizedBox(height: 2),
-        Text(step['sub']!, style: GoogleFonts.inter(fontSize: 11, color: OV.onSurfaceVariant, height: 1.4)),
-      ])),
-    ]))),
-    DividerLine(),
-    const SizedBox(height: 10),
-    GestureDetector(onTap: () {},
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.picture_as_pdf_outlined, size: 14, color: OV.primary),
-          const SizedBox(width: 6),
-          Text('Generate PDF Report', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: OV.primary)),
-        ])),
-  ]));
+  Widget _buildRunAllButton() {
+    final isRunning = _assessingSymptoms || _assessingCbc;
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: isRunning ? null : _runBothAssessments,
+        icon: isRunning
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.auto_awesome_rounded, size: 20),
+        label: Text(
+          isRunning
+              ? 'Calculating Risk Scores...'
+              : 'Run Dual AI Risk Assessment',
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: OV.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSymptomCard() {
+    return DCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.checklist_rounded,
+                    color: Color(0xFF2E7D32), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Symptom Risk Model',
+                      style: GoogleFonts.manrope(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: OV.onSurface,
+                      ),
+                    ),
+                    Text(
+                      '16 Clinical Symptoms • leukemia-symptom-v1',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: OV.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_assessingSymptoms)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton(
+                  onPressed: _runSymptomAssessment,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(
+                    _symptomResult == null ? 'Assess' : 'Re-assess',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: OV.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Divider(height: 20),
+          if (_symptomResult == null) ...[
+            Text(
+              'No symptom assessment generated yet. Click "Assess" to analyze the patient\'s 16 recorded symptoms.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: OV.outline,
+                height: 1.4,
+              ),
+            ),
+          ] else ...[
+            _buildResultBody(_symptomResult!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCbcCard() {
+    return DCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDE7F6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.biotech_rounded,
+                    color: Color(0xFF512DA8), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CBC Risk Model',
+                      style: GoogleFonts.manrope(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: OV.onSurface,
+                      ),
+                    ),
+                    Text(
+                      '9 CBC Parameters • leukemia-cbc-v1',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: OV.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_assessingCbc)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton(
+                  onPressed: _runCbcAssessment,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(
+                    _cbcResult == null ? 'Assess' : 'Re-assess',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: OV.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Divider(height: 20),
+          if (_cbcResult == null) ...[
+            Text(
+              'No CBC assessment generated yet. Click "Assess" to analyze the 9 finalized CBC parameters.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: OV.outline,
+                height: 1.4,
+              ),
+            ),
+          ] else ...[
+            _buildResultBody(_cbcResult!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultBody(AiRiskResult result) {
+    final isElevated = result.isElevatedRisk;
+    final statusColor =
+        isElevated ? const Color(0xFFC62828) : const Color(0xFF2E7D32);
+    final statusBg =
+        isElevated ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusBg,
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(color: statusColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isElevated
+                        ? Icons.warning_amber_rounded
+                        : Icons.check_circle_outline_rounded,
+                    color: statusColor,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    result.prediction,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              'Risk Score: ${result.formattedPercentage}',
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: statusColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: result.riskScore.clamp(0.0, 1.0),
+            minHeight: 8,
+            backgroundColor: OV.surfaceContainer,
+            valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+          ),
+        ),
+        if (result.contributingFactors.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(
+            'KEY CONTRIBUTING FACTORS',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: OV.outline,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: result.contributingFactors.map((f) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: OV.surfaceLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: OV.outlineVariant),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.arrow_right_rounded,
+                        size: 14, color: OV.primary),
+                    Text(
+                      f,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: OV.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildClinicalDisclaimer() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFD54F)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              color: Color(0xFFF57F17), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Clinical Decision Support Disclaimer',
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF5D4037),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'This AI system provides risk stratification to assist clinical judgment. It does not replace comprehensive pathological examination or specialist diagnosis. Symptom models are derived from pediatric cohort data.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: const Color(0xFF5D4037),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDoctorReviewCard() {
+    final canReview = _symptomResult != null || _cbcResult != null;
+
+    return DCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Doctor-in-the-Loop Review',
+            style: GoogleFonts.manrope(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: OV.onSurface,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Confirm review of AI risk scores and contributing factors. Approved assessments are permanently appended to the patient\'s EHR audit log.',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: OV.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed:
+                  (!canReview || _savingReview) ? null : _saveDoctorReview,
+              icon: _savingReview
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.verified_user_outlined, size: 18),
+              label: Text(
+                _savingReview
+                    ? 'Saving Review...'
+                    : 'Confirm Doctor Review & Save to EHR',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: OV.slateDark,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

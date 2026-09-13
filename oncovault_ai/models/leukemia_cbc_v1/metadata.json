@@ -1,0 +1,70 @@
+{
+  "model_version": "leukemia-cbc-v1",
+  "algorithm": "Gradient Boosting",
+  "algorithm_class": "GradientBoostingClassifier",
+  "hyperparameters": {
+    "ccp_alpha": 0.0,
+    "criterion": "friedman_mse",
+    "init": null,
+    "learning_rate": 0.1,
+    "loss": "log_loss",
+    "max_depth": 4,
+    "max_features": null,
+    "max_leaf_nodes": null,
+    "min_impurity_decrease": 0.0,
+    "min_samples_leaf": 1,
+    "min_samples_split": 2,
+    "min_weight_fraction_leaf": 0.0,
+    "n_estimators": 100,
+    "n_iter_no_change": null,
+    "random_state": 42,
+    "subsample": 1.0,
+    "tol": 0.0001,
+    "validation_fraction": 0.1,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "training_dataset": "Multi-Site CBC Training Cohort (3 sites)",
+  "training_samples": 26922,
+  "validation_dataset": "Multi-Site CBC Validation Cohort (7 sites, 361,260 samples)",
+  "independent_test_dataset": "True-World Independent Test Site (58,481 samples)",
+  "features": [
+    "WBC",
+    "RBC",
+    "HGB",
+    "PLT",
+    "NEUT_ABS",
+    "NEUT_PCT",
+    "MONO_ABS",
+    "RDW_SD",
+    "RDW_CV"
+  ],
+  "feature_labels": {
+    "WBC": "White Blood Cell Count",
+    "RBC": "Red Blood Cell Count",
+    "HGB": "Hemoglobin",
+    "PLT": "Platelet Count",
+    "NEUT_ABS": "Absolute Neutrophil Count (NEUT#)",
+    "NEUT_PCT": "Neutrophil Percentage (NEUT%)",
+    "MONO_ABS": "Absolute Monocyte Count (MONO#)",
+    "RDW_SD": "Red Cell Distribution Width (SD)",
+    "RDW_CV": "Red Cell Distribution Width (CV)"
+  },
+  "feature_units": {
+    "WBC": "10^9/L",
+    "RBC": "10^12/L",
+    "HGB": "g/L",
+    "PLT": "10^9/L",
+    "NEUT_ABS": "10^9/L",
+    "NEUT_PCT": "%",
+    "MONO_ABS": "10^9/L",
+    "RDW_SD": "fL",
+    "RDW_CV": "%"
+  },
+  "target_mapping": {
+    "0": "Healthy (Lower Risk)",
+    "1": "Leukemia (Elevated Risk)"
+  },
+  "disclaimer": "AI risk assessment is for clinical decision support and is not a definitive diagnosis.",
+  "created_at": "2026-09-11T12:04:58.495567+00:00"
+}

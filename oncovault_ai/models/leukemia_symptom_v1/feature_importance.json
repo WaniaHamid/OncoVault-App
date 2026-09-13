@@ -1,0 +1,82 @@
+[
+  {
+    "feature_key": "swollen_painless_lymph_nodes",
+    "label": "Swollen Painless Lymph Nodes",
+    "importance": 0.16645597398537035
+  },
+  {
+    "feature_key": "frequent_infections",
+    "label": "Frequent Infections",
+    "importance": 0.1635155579392931
+  },
+  {
+    "feature_key": "enlarged_liver",
+    "label": "Enlarged Liver / Hepatomegaly",
+    "importance": 0.1514497568589295
+  },
+  {
+    "feature_key": "bone_pain",
+    "label": "Bone Pain",
+    "importance": 0.14332436146744088
+  },
+  {
+    "feature_key": "persistent_weakness_fatigue",
+    "label": "Persistent Weakness & Fatigue",
+    "importance": 0.10476590399249212
+  },
+  {
+    "feature_key": "jaundice",
+    "label": "Jaundice",
+    "importance": 0.06795908127492818
+  },
+  {
+    "feature_key": "loss_of_appetite_nausea",
+    "label": "Loss of Appetite / Nausea",
+    "importance": 0.06789336801828078
+  },
+  {
+    "feature_key": "family_history",
+    "label": "Family History of Cancer",
+    "importance": 0.06370927985218296
+  },
+  {
+    "feature_key": "significant_bruising_bleeding",
+    "label": "Significant Bruising / Bleeding",
+    "importance": 0.03429492258057948
+  },
+  {
+    "feature_key": "fever",
+    "label": "Fever",
+    "importance": 0.02102957062950913
+  },
+  {
+    "feature_key": "night_sweats",
+    "label": "Night Sweats",
+    "importance": 0.00848641891330132
+  },
+  {
+    "feature_key": "smoking_history",
+    "label": "Smoking History",
+    "importance": 0.0035004327396933855
+  },
+  {
+    "feature_key": "oral_cavity_changes",
+    "label": "Oral Cavity Changes",
+    "importance": 0.0021856329513034226
+  },
+  {
+    "feature_key": "vision_blurring",
+    "label": "Vision Blurring",
+    "importance": 0.0006377555655640435
+  },
+  {
+    "feature_key": "shortness_of_breath",
+    "label": "Shortness of Breath",
+    "importance": 0.0004635117771210882
+  },
+  {
+    "feature_key": "itchy_skin_rash",
+    "label": "Itchy Skin / Rash",
+    "importance": 0.0003284714540102685
+  }
+]
